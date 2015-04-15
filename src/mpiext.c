@@ -35,7 +35,7 @@
 
 /* Handle MPI constants export (shamelessly stolen from _cursesmodule.c)*/
 #define SetDictInt(string,ch) \
-        PyDict_SetItemString(ModDict, string, PyInt_FromLong((long) (ch)));
+        PyDict_SetItemString(ModDict, string, PyLong_FromLong((long) (ch)));
 
 /* Remap struct MPI_op to int (easier to handle by python)*/
 #define MAX 1
@@ -1012,7 +1012,7 @@ static PyObject * init(PyObject *self, PyObject *args) {
   argv = (char**) malloc((argc+1)*sizeof(char*)); 
   
   for (i=0; i<argc; i++)  
-    argv[i] = PyString_AsString( PyList_GetItem(input, i) );
+    argv[i] = PyBytes_AS_STRING( PyList_GetItem(input, i) );
     
   argv[i] = NULL; /* Lam 7.0 requires last arg to be NULL  */
   
@@ -1145,13 +1145,27 @@ static struct PyMethodDef MethodTable[] = {
 };
 
 
+static struct PyModuleDef mpiext = {
+   PyModuleDef_HEAD_INIT,
+   "mpiext",   /* name of module */
+   NULL, /* module documentation, may be NULL */
+   -1,     /* size of per-interpreter state of the module,
+                or -1 if the module keeps state in global variables. */
+   MethodTable
+};
+
+
 /***************************/
 /* Module initialisation   */
 /***************************/
-void initmpiext(void){
+
+
+PyMODINIT_FUNC
+PyInit_mpiext(void)
+{
   PyObject *m, *ModDict;
   
-  m = Py_InitModule("mpiext", MethodTable);
+  m = PyModule_Create(&mpiext);
   
   /* to handle MPI symbolic constants*/
   ModDict = PyModule_GetDict(m); 
@@ -1174,5 +1188,7 @@ void initmpiext(void){
 
   /*SetDictInt("MPI_COMM_WORLD", MPI_COMM_WORLD);  */
    
-  import_array();     /* Necessary for handling of numpy structures  */
+  import_array(); 
+  return m;
 }
+

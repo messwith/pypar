@@ -21,7 +21,6 @@ See doc strings of individual functions for detailed documentation.
 """
 
 from numpy import zeros, reshape, product
-import types
 import string
 
 #----------
@@ -65,7 +64,7 @@ def send(x, destination, use_buffer=False, vanilla=False,
 
     # Input check
     errmsg = 'Destination id (%s) must be an integer.' % destination
-    assert type(destination) == types.IntType, errmsg
+    assert type(destination) == int, errmsg
 
     errmsg = 'Tag %d is reserved by pypar - please use another.' % control_tag
     assert tag != control_tag, errmsg
@@ -128,7 +127,7 @@ def receive(source, buffer=None, vanilla=False, tag=default_tag,
     else:
         # Input check
         errmsg = 'Source id (%s) must be an integer.' % source
-        assert type(source) == types.IntType, errmsg
+        assert type(source) == int, errmsg
 
         errmsg = 'Tag %d is reserved by pypar - please use another.'\
             % control_tag
@@ -158,7 +157,7 @@ def receive(source, buffer=None, vanilla=False, tag=default_tag,
             stat = receive_string(buffer, source, tag)
 
         elif protocol == 'vanilla':
-            from cPickle import dumps, loads, UnpicklingError
+            from pickle import dumps, loads, UnpicklingError
             if buffer is None:
                 s = ' ' * size
             else:
@@ -166,9 +165,9 @@ def receive(source, buffer=None, vanilla=False, tag=default_tag,
                 s = s + ' ' * int(0.1 * len(s))  # Safety margin
 
             stat = receive_string(s, source, tag)
-            try:
-                buffer = loads(s)  # Replace buffer with received result
-            except UnpicklingError, err:
+            try:                
+                buffer = loads(bytes(s, 'utf-8'))  # Replace buffer with received result
+            except UnpicklingError as err:
                 raise UnpicklingError(str(err) + " - '%s'" % s)
         else:
             raise 'Unknown protocol: %s' % protocol
@@ -204,7 +203,7 @@ def broadcast(buffer, root=0, vanilla=False, bypass=False):
 
     # Input check
     errmsg = 'Root id (%s) must be an integer.' % root
-    assert type(root) == types.IntType, errmsg
+    assert type(root) == int, errmsg
 
     # Create metadata about object to be sent
     protocol = create_control_info(buffer, vanilla)[0]
@@ -215,14 +214,14 @@ def broadcast(buffer, root=0, vanilla=False, bypass=False):
     elif protocol == 'string':
         broadcast_string(buffer, root)
     elif protocol == 'vanilla':
-        from cPickle import loads, dumps, UnpicklingError
+        from pickle import loads, dumps, UnpicklingError
         s = dumps(buffer, protocol=2)
         s = s + ' ' * int(0.1 * len(s))  # Safety margin
 
         broadcast_string(s, root)
         try:
             buffer = loads(s)
-        except UnpicklingError, err:
+        except (UnpicklingError, err):
             raise UnpicklingError(str(err) + " - '%s'" % s)
     else:
         raise 'Unknown protocol: %s' % protocol
@@ -244,7 +243,7 @@ def scatter(x, root=0, buffer=None, vanilla=False):
 
     # Input check
     errmsg = 'Root id (%s) must be an integer.' % root
-    assert type(root) == types.IntType, errmsg
+    assert type(root) == int, errmsg
 
     # Create metadata about object to be sent
     protocol, typecode, size, shape = create_control_info(x)
@@ -290,7 +289,7 @@ def gather(x, root=0, buffer=None, vanilla=0):
 
     # Input check
     errmsg = 'Root id (%s) must be an integer.' % root
-    assert type(root) == types.IntType, errmsg
+    assert type(root) == int, errmsg
 
     # Create metadata about object to be gathered
     protocol, typecode, size, shape = create_control_info(x)
@@ -340,7 +339,7 @@ def reduce(x, op, root=0, buffer=None, vanilla=0, bypass=False):
 
     # Input check
     errmsg = 'Root id (%s) must be an integer.' % root
-    assert type(root) == types.IntType, errmsg
+    assert type(root) == int, errmsg
 
     # Create metadata about object
     protocol, typecode, size, shape = create_control_info(x)
@@ -378,7 +377,7 @@ def bsend(x, destination, use_buffer=False, vanilla=False,
 
     # Input check.
     errmsg = 'Destination id (%s) must be an integer.' % destination
-    assert type(destination) == types.IntType, errmsg
+    assert type(destination) == int, errmsg
 
     errmsg = 'Tag %d is reserved by pypar - please use another.' % control_tag
     assert tag != control_tag, errmsg
@@ -555,7 +554,7 @@ def create_control_info(x, vanilla=0, return_object=False):
                   mpiext.receive_string.
        'vanilla': All other types can be communicated as string
                   representations provided that the objects
-                  can be serialised using pickle (or cPickle).
+                  can be serialised using pickle (or pickle).
                   The latter mode is less efficient than the
                   first two but it can handle general structures.
 
@@ -579,7 +578,7 @@ def create_control_info(x, vanilla=0, return_object=False):
 
     # Determine protocol in case
     if not vanilla:
-        if type(x) == types.StringType:
+        if type(x) == bytes:
             protocol = 'string'
             typecode = 'c'
             size = len(x)
@@ -587,8 +586,8 @@ def create_control_info(x, vanilla=0, return_object=False):
             try:
                 import numpy
             except:
-                print 'WARNING (pypar.py): numpy could not be imported.',
-                print 'Reverting to vanilla mode'
+                print ('WARNING (pypar.py): numpy could not be imported.')
+                print ('Reverting to vanilla mode')
                 protocol = 'vanilla'
             else:
                 typecode = x.dtype.char
@@ -601,12 +600,12 @@ def create_control_info(x, vanilla=0, return_object=False):
                            '%s is not supported.' % x.dtype.char)
                     print ('Only types \'i\', \'l\', \'f\', \'d\', \'F\' and '
                            ' \'D\' are supported.'),
-                    print 'Reverting to vanilla mode.'
+                    print ('Reverting to vanilla mode.')
                     protocol = 'vanilla'
 
     # Pickle general structures using the vanilla protocol
     if protocol == 'vanilla':
-        from cPickle import dumps
+        from pickle import dumps
         x = dumps(x, protocol=2)
         size = len(x)  # Let count be length of pickled object
 
@@ -625,7 +624,7 @@ def send_control_info(control_info, destination):
     # Convert to strings
     control_info = [str(c) for c in control_info]
 
-    control_msg = string.join(control_info, control_sep)
+    control_msg = control_sep.join(control_info)
     if len(control_msg) > control_data_max_size:
         errmsg = ('Length of control_info exceeds specified maximium (%d)'
                   % control_data_max_size)
@@ -673,7 +672,7 @@ def receive_control_info(source, return_source=False):
 import sys
 import os
 import os.path
-dirname = os.path.dirname(string.replace(__name__, '.', os.sep)).strip()
+dirname = os.path.dirname(__name__.replace('.', os.sep)).strip()
 
 if not dirname:
     dirname = '.'
@@ -686,8 +685,10 @@ if dirname[-1] != os.sep:
 #
 # Verify existence of mpiext.so.
 try:
-    import mpiext
-except:
+    from . import mpiext
+    print("Success")
+except Exception as e:
+    print(e)
     errmsg = 'ERROR: C extension mpiext could not be imported.\n'
     errmsg += 'Please compile mpiext.c e.g. by running\n'
     errmsg += '  python compile_pypar_locally.py\n'
@@ -695,7 +696,7 @@ except:
     errmsg += '  python setup.py install\n'
     #raise Exception, errmsg
     error = 1
-    print errmsg
+    print (errmsg)
 else:
     # Determine if MPI program is allowed to run sequentially on current
     # platform
@@ -752,7 +753,7 @@ else:
 # sequential execution.
 
 if error:
-    print 'WARNING: MPI library could not be initialised. Running sequentially'
+    print ('WARNING: MPI library could not be initialised. Running sequentially')
 
     # Define rudimentary functions to keep sequential programs happy
     def size():
@@ -788,7 +789,7 @@ if error:
         return time.time()
 
 else:
-    from mpiext import size, rank, barrier, time,\
+    from .mpiext import size, rank, barrier, time,\
         get_processor_name,\
         init, initialized, finalize, abort,\
         send_string, receive_string,\
